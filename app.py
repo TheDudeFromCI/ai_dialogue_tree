@@ -11,49 +11,49 @@ CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", "characters.json")
 TREE_FILE = os.getenv("TREE_FILE", "tree.json")
 
 
-try:
-    with open(CHARACTERS_FILE) as f:
-        characters = json.load(f)
-except Exception as e:
-    print(f"Error loading characters file: {str(e)}")
-    sys.exit(1)
+def load_characters():
+    global characters
 
-try:
-    with open(TREE_FILE) as f:
-        tree = json.load(f)
-except FileNotFoundError:
-    tree = {}
-except Exception as e:
-    print(f"Error loading tree file: {str(e)}")
-    sys.exit(1)
+    try:
+        with open(CHARACTERS_FILE) as f:
+            characters = json.load(f)
+    except Exception as e:
+        print(f"Error loading characters file: {str(e)}")
+        characters = {}
+
+    characters.setdefault("System", {})
+    characters["System"].setdefault("model", "model")
+    characters["System"].setdefault("temp", 0.7)
+    characters["System"].setdefault("maxTokens", 256)
 
 
-def build_node(sender, text, parent):
-    nid = str(uuid4())
+def load_tree():
+    global tree
 
-    tree[nid] = {
-        "nid": nid,
-        "sender": sender,
-        "text": text,
-        "parent": parent,
-        "children": [],
-    }
+    try:
+        with open(TREE_FILE) as f:
+            tree = json.load(f)
+    except FileNotFoundError:
+        tree = {}
+    except Exception as e:
+        print(f"Error loading tree file: {str(e)}")
+        sys.exit(1)
 
-    if parent is not None:
-        tree[parent]["children"].append(nid)
-
-    return nid
+    if not tree:
+        nid = str(uuid4())
+        tree[nid] = {
+            "nid": nid,
+            "sender": sender,
+            "text": build_prompt(),
+            "parent": parent,
+            "children": [],
+        }
+        save_tree_file()
 
 
 def build_prompt():
     global characters
-
-    with open(CHARACTERS_FILE) as f:
-        try:
-            characters = json.load(f)
-        except Exception as e:
-            print(f"Error loading characters file: {str(e)}")
-            return
+    load_characters()
 
     prompt = ""
     for c_name in characters:
@@ -118,14 +118,12 @@ def send_regen_complete(nid):
     )
 
 
+load_characters()
+load_tree()
+
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 model = lms.llm(characters["System"]["model"])
-
-if not tree:
-    prompt = build_prompt()
-    build_node("System", prompt, None)
-    save_tree_file()
 
 
 @app.route("/", methods=["GET"])
@@ -207,22 +205,26 @@ def regen_node(data):
     tokens = len(model.tokenize(log))
     max_tokens = model.get_context_length()
 
-    print("=" * 100)
-    print(f"Regenerating node: {nid} ({tokens}/{max_tokens} tokens)")
-    print("-" * 100)
-    print(log, end=" ", flush=True)
+    print(f"{nid}: Regenerating node ({tokens}/{max_tokens} tokens)")
 
-    result = model.complete(
-        log, config={"maxTokens": 768, "stopStrings": ["\n"], "temperature": 0.7}
-    )
+    result = None
+    text = ""
+    for _ in range(10):
+        result = model.complete(
+            log,
+            config={
+                "maxTokens": characters["System"]["maxTokens"],
+                "stopStrings": ["\n"],
+                "temperature": characters["System"]["temp"],
+            },
+        )
 
-    text = result.content.strip()
-    print(text)
-    print("-" * 100)
+        text = result.content.strip()
+        if text != "":
+            break
 
     if text == "":
-        print(f"Generated 0 tokens.")
-        print("=" * 100)
+        print(f"{nid} Failed to generate. Giving up.")
         send_regen_complete(nid)
         return
 
@@ -232,8 +234,7 @@ def regen_node(data):
         + result.stats.time_to_first_token_sec
     )
 
-    print(f"Generated {gen_tokens} tokens in {gen_time:.1f} seconds.")
-    print("=" * 100)
+    print(f"{nid}: Generated {gen_tokens} tokens in {gen_time:.1f} seconds.")
 
     if extend:
         text = f"{existing_text}  {text}"
