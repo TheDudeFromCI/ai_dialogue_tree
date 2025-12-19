@@ -221,8 +221,16 @@ function buildNodeSender(node) {
 
   sender.onchange = () => {
     node.sender = sender.value;
-    containers[node.nid]["div"].style["border-color"] = getColor(node);
     sendEditNode(node.nid);
+
+    containers[node.nid]["div"].style["border-color"] = getColor(node);
+
+    if (containers[node.nid]["textDisplay"]) {
+      let textDisplayClass = "textdisplay show";
+      if (containers[node.nid]["sender"].value == "System")
+        textDisplayClass += " system";
+      containers[node.nid]["textDisplay"].className = textDisplayClass;
+    }
   };
 
   return sender;
@@ -246,7 +254,11 @@ function buildNodeTextarea(node) {
     if (node.parent == null) return;
 
     text.className = "hide";
-    containers[node.nid]["textDisplay"].className = "textdisplay show";
+
+    let textDisplayClass = "textdisplay show";
+    if (containers[node.nid]["sender"].value == "System")
+      textDisplayClass += " system";
+    containers[node.nid]["textDisplay"].className = textDisplayClass;
   });
 
   return text;
@@ -260,8 +272,12 @@ function buildNodeTextDisplay(node) {
   textDisplay.contenteditable = true;
   textDisplay.innerHTML = marked.parse(node.text);
 
+  let textDisplayClass = "textdisplay show";
+  if (containers[node.nid]["sender"].value == "System")
+    textDisplayClass += " system";
+
   if (node.parent == null) textDisplay.className = "hide";
-  else textDisplay.className = "textdisplay show";
+  else textDisplay.className = textDisplayClass;
 
   textDisplay.addEventListener("click", () => {
     if (node.parent == null) return;

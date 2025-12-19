@@ -73,6 +73,10 @@ textarea {
   color: #bbbbbb;
 }
 
+.textdisplay.system p {
+  color: #9f9fff;
+}
+
 .textdisplay:has(.ticker) {
   display: flex;
   align-items: center;
