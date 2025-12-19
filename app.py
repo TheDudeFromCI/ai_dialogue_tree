@@ -62,14 +62,14 @@ def build_prompt():
             continue
 
         prompt += f"[\n"
-        prompt += f"  name: {c_name}\n"
+        prompt += f'  name: "{c_name}"\n'
 
         for trait in character["traits"]:
             value = character["traits"][trait]
             if isinstance(value, list):
-                value = " + ".join(str(x) for x in value)
+                value = " + ".join(f'"{str(x)}"' for x in value)
             else:
-                value = str(value)
+                value = f'"{str(value)}"'
 
             prompt += f"  {trait}: {value}\n"
         prompt += "]\n\n"
