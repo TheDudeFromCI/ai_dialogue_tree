@@ -7,8 +7,9 @@ from uuid import uuid4
 import lmstudio as lms
 
 
-CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", 'characters.json')
-TREE_FILE = os.getenv("TREE_FILE", 'tree.json')
+CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", "characters.json")
+TREE_FILE = os.getenv("TREE_FILE", "tree.json")
+
 
 with open(CHARACTERS_FILE) as f:
     characters = json.load(f)
@@ -18,7 +19,7 @@ with open(TREE_FILE) as f:
 
 
 def build_node(sender, text, parent):
-    nid = str(uuid4()) 
+    nid = str(uuid4())
 
     tree[nid] = {
         "nid": nid,
@@ -40,7 +41,8 @@ def build_prompt():
     prompt = ""
     for c_name in characters:
         character = characters[c_name]
-        if not "traits" in character: continue
+        if not "traits" in character:
+            continue
 
         prompt += f"[\n"
         prompt += f"  name: {c_name}\n"
@@ -80,14 +82,20 @@ def build_chat_log(nid):
 
 
 def save_tree_file():
-    with open(TREE_FILE, 'w') as f:
+    with open(TREE_FILE, "w") as f:
         json.dump(tree, f, indent=2)
     print("Saved dialogue tree.")
 
 
-def save_and_emit():
-    save_tree_file()
-    emit("tree_update", tree, broadcast=True)
+def send_regen_complete(nid):
+    emit(
+        "regen_complete",
+        {
+            "nid": nid,
+            "text": tree[nid]["text"],
+        },
+        broadcast=True,
+    )
 
 
 app = Flask(__name__)
@@ -100,7 +108,7 @@ if not tree:
     save_tree_file()
 
 
-@app.route("/", methods=['GET'])
+@app.route("/", methods=["GET"])
 def index_html():
     try:
         return send_file("index.html")
@@ -108,7 +116,7 @@ def index_html():
         return make_response(f"Err: {str(e)}", 500)
 
 
-@app.route("/index.css", methods=['GET'])
+@app.route("/index.css", methods=["GET"])
 def index_css():
     try:
         return send_file("index.css")
@@ -116,7 +124,7 @@ def index_css():
         return make_response(f"Err: {str(e)}", 500)
 
 
-@app.route("/index.js", methods=['GET'])
+@app.route("/index.js", methods=["GET"])
 def index_js():
     try:
         return send_file("index.js")
@@ -128,82 +136,46 @@ def index_js():
 def on_connect():
     print("Client connected.")
 
-    emit("characters", characters)
-    emit("tree_update", tree)
-
-
-@socketio.on("create_node")
-def create_node(data):
-    parent = data["parent"]
-    if parent is None:
-        return
-
-    print(f"Creating child node for {parent}")
-
-    build_node("Sender", "Text", parent)
-    save_and_emit()
+    emit(
+        "load",
+        {
+            "characters": characters,
+            "tree": tree,
+        },
+    )
 
 
 @socketio.on("edit_node")
 def edit_node(data):
     nid = data["nid"]
-    tree[nid]["sender"] = data["sender"]
-    tree[nid]["text"] = data["text"]
-
+    tree[nid] = data
     save_tree_file()
 
 
 @socketio.on("delete_node")
 def delete_node(data):
     nid = data["nid"]
-    parent = tree[nid]["parent"]
-
-    if parent is None:
-        return
-
-    print(f"Deleting node: {nid}")
-    tree[parent]["children"].remove(nid)
-
-    def delete_recursive(n):
-        for c in tree[n]["children"]:
-            delete_recursive(c)
-        del tree[n]
-
-    delete_recursive(nid)
-    save_and_emit()
-
-
-@socketio.on("clone_node")
-def clone_node(data):
-    nid = data["nid"]
-
-    if tree[nid]["parent"] is None:
-        return
-
-    print(f"Cloning node: {nid}")
-
-    def clone_recursive(n, parent):
-        node = build_node(tree[n]["sender"], tree[n]["text"], parent)
-
-        for cid in tree[n]["children"]:
-            clone_recursive(cid, node)
-
-    clone_recursive(nid, tree[nid]["parent"])
-    save_and_emit()
+    del tree[nid]
+    save_tree_file()
 
 
 @socketio.on("regen_node")
 def regen_node(data):
     nid = data["nid"]
+    extend = data["extend"]
     parent = tree[nid]["parent"]
 
     if parent is None:
         tree[nid]["text"] = build_prompt()
-        emit("tree_update", tree, broadcast=True)
+        save_tree_file()
+        send_regen_complete(nid)
         return
 
     log = build_chat_log(parent)
     log += f"{tree[nid]["sender"]}:"
+
+    if extend:
+        log += f" {tree[nid]["text"]}"
 
     tokens = len(model.tokenize(log))
     max_tokens = model.get_context_length()
@@ -211,62 +183,31 @@ def regen_node(data):
     print("=" * 100)
     print(f"Regenerating node: {nid} ({tokens}/{max_tokens} tokens)")
     print("-" * 100)
-    print(log, end=' ', flush=True)
+    print(log, end=" ", flush=True)
 
-    result = model.complete(log, config={
-        "maxTokens": 256,
-        "stopStrings": ["\n"],
-        "temperature": 0.7
-    })
+    result = model.complete(
+        log, config={"maxTokens": 256, "stopStrings": ["\n"], "temperature": 0.7}
+    )
 
     text = result.content.strip()
     print(text)
     print("-" * 100)
 
     gen_tokens = result.stats.predicted_tokens_count
-    gen_time = gen_tokens / result.stats.tokens_per_second + result.stats.time_to_first_token_sec
+    if gen_tokens == 0:
+        gen_time = result.stats.time_to_first_token_sec
+    else:
+        gen_time = (
+            gen_tokens / result.stats.tokens_per_second
+            + result.stats.time_to_first_token_sec
+        )
+
     print(f"Generated {gen_tokens} tokens in {gen_time:.1f} seconds.")
     print("=" * 100)
+
+    if extend:
+        text = tree[nid]["text"] + " " + text
 
     tree[nid]["text"] = text
-    save_and_emit()
-
-
-@socketio.on("regen_cont_node")
-def regen_cont_node(data):
-    nid = data["nid"]
-    parent = tree[nid]["parent"]
-
-    if parent is None:
-        tree[nid]["text"] = build_prompt()
-        emit("tree_update", tree, broadcast=True)
-        return
-
-    log = build_chat_log(parent)
-    log += f"{tree[nid]["sender"]}: {tree[nid]["text"]}"
-
-    tokens = len(model.tokenize(log))
-    max_tokens = model.get_context_length()
-
-    print("=" * 100)
-    print(f"Extending node: {nid} ({tokens}/{max_tokens} tokens)")
-    print("-" * 100)
-    print(log, end=' ', flush=True)
-
-    result = model.complete(log, config={
-        "maxTokens": 256,
-        "stopStrings": ["\n"],
-        "temperature": 0.7
-    })
-
-    text = result.content.strip()
-    print(text)
-    print("-" * 100)
-
-    gen_tokens = result.stats.predicted_tokens_count
-    gen_time = gen_tokens / result.stats.tokens_per_second + result.stats.time_to_first_token_sec
-    print(f"Generated {gen_tokens} tokens in {gen_time:.1f} seconds.")
-    print("=" * 100)
-
-    tree[nid]["text"] += f" {text}"
-    save_and_emit()
+    save_tree_file()
+    send_regen_complete(nid)

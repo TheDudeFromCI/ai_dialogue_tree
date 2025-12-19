@@ -1,4 +1,12 @@
 #!/bin/bash
 
 source .venv/bin/activate
-flask run -p 8126
+
+if [ -f ".env" ]; then
+  echo "Loading environment variables from .env file"
+  set -a
+  source .env
+  set +a
+fi
+
+flask run -p "${PORT:-8126}"
