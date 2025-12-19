@@ -11,11 +11,21 @@ CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", "characters.json")
 TREE_FILE = os.getenv("TREE_FILE", "tree.json")
 
 
-with open(CHARACTERS_FILE) as f:
-    characters = json.load(f)
+try:
+    with open(CHARACTERS_FILE) as f:
+        characters = json.load(f)
+except Exception as e:
+    print(f"Error loading characters file: {str(e)}")
+    sys.exit(1)
 
-with open(TREE_FILE) as f:
-    tree = json.load(f)
+try:
+    with open(TREE_FILE) as f:
+        tree = json.load(f)
+except FileNotFoundError:
+    tree = {}
+except Exception as e:
+    print(f"Error loading tree file: {str(e)}")
+    sys.exit(1)
 
 
 def build_node(sender, text, parent):
@@ -39,7 +49,11 @@ def build_prompt():
     global characters
 
     with open(CHARACTERS_FILE) as f:
-        characters = json.load(f)
+        try:
+            characters = json.load(f)
+        except Exception as e:
+            print(f"Error loading characters file: {str(e)}")
+            return
 
     prompt = ""
     for c_name in characters:
@@ -85,9 +99,12 @@ def build_chat_log(nid):
 
 
 def save_tree_file():
-    with open(TREE_FILE, "w") as f:
-        json.dump(tree, f, indent=2)
-    print("Saved dialogue tree.")
+    try:
+        with open(TREE_FILE, "w") as f:
+            json.dump(tree, f, indent=2)
+        print("Saved dialogue tree.")
+    except Exception as e:
+        print(f"Error saving tree file: {str(e)}")
 
 
 def send_regen_complete(nid):
