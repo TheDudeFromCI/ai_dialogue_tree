@@ -155,6 +155,8 @@ def edit_node(data):
 @socketio.on("delete_node")
 def delete_node(data):
     nid = data["nid"]
+    if nid not in tree:
+        return
     del tree[nid]
     save_tree_file()
 
@@ -163,6 +165,10 @@ def delete_node(data):
 def regen_node(data):
     nid = data["nid"]
     extend = data["extend"]
+    if nid not in tree:
+        print(f"Node {nid} not found for regeneration.")
+        return
+
     parent = tree[nid]["parent"]
 
     if parent is None:

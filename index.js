@@ -146,7 +146,12 @@ function buildNode(node) {
 }
 
 function buildNodeLine(child, parent) {
-  let nodeWidth = parent.isRoot ? NODE_WIDTH * 2 : NODE_WIDTH;
+  if (!child || !parent) {
+    console.warn("Cannot build line, missing child or parent");
+    return;
+  }
+
+  let nodeWidth = parent.parent == null ? NODE_WIDTH * 2 : NODE_WIDTH;
   let nSiblings = parent.children.length;
   let childIndex = parent.children.findIndex((id) => id == child.nid);
   let offset = (nodeWidth / (nSiblings + 1)) * (childIndex + 1);
@@ -319,20 +324,22 @@ function createNode(parentNid) {
 
 function deleteNode(nid) {
   let parent = tree[tree[nid].parent];
-  let childIndex = parent.children.findIndex((id) => id == nid);
-  parent.children.splice(childIndex, 1);
-  sendEditNode(parent.nid);
+  if (parent) {
+    let childIndex = parent.children.findIndex((id) => id == nid);
+    parent.children.splice(childIndex, 1);
+    sendEditNode(parent.nid);
+  }
 
   function deleteRecursive(nid) {
-    for (const cid of tree[nid].children) {
+    for (const cid of tree[nid]?.children ?? []) {
       deleteRecursive(cid);
     }
 
     delete tree[nid];
     sendDeleteNode(nid);
 
-    containers[nid]["div"].remove();
-    containers[nid]["line"].remove();
+    containers[nid]?.["div"]?.remove();
+    containers[nid]?.["line"]?.remove();
     delete containers[nid];
   }
 
@@ -357,7 +364,7 @@ function cloneNode(oldNid) {
 
   buildNode(tree[nid]);
   sendEditNode(nid);
-  sendEditNode(parentNid);
+  sendEditNode(oldNode.parent);
 
   recalculateVirtualSizes();
   recalculatePositions();
