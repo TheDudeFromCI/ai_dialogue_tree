@@ -199,9 +199,10 @@ def regen_node(data):
 
     log = build_chat_log(parent)
     log += f"{tree[nid]["sender"]}:"
+    existing_text = tree[nid]["text"].strip()
 
     if extend:
-        log += f" {tree[nid]["text"]}"
+        log += f" {existing_text}"
 
     tokens = len(model.tokenize(log))
     max_tokens = model.get_context_length()
@@ -219,20 +220,23 @@ def regen_node(data):
     print(text)
     print("-" * 100)
 
+    if text == "":
+        print(f"Generated 0 tokens.")
+        print("=" * 100)
+        send_regen_complete(nid)
+        return
+
     gen_tokens = result.stats.predicted_tokens_count
-    if gen_tokens == 0:
-        gen_time = result.stats.time_to_first_token_sec
-    else:
-        gen_time = (
-            gen_tokens / result.stats.tokens_per_second
-            + result.stats.time_to_first_token_sec
-        )
+    gen_time = (
+        gen_tokens / result.stats.tokens_per_second
+        + result.stats.time_to_first_token_sec
+    )
 
     print(f"Generated {gen_tokens} tokens in {gen_time:.1f} seconds.")
     print("=" * 100)
 
     if extend:
-        text = tree[nid]["text"] + " " + text
+        text = f"${existing_text}  ${text}"
 
     tree[nid]["text"] = text
     save_tree_file()
