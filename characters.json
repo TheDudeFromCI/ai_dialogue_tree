@@ -1,0 +1,22 @@
+{
+	"System": {
+		"color": "#ffffff",
+		"model": "beepo-22b"
+	},
+	"Character A": {
+		"color": "#7777ff",
+		"traits": {
+			"gender": "male",
+			"age": 21,
+			"personality": "stoic"
+		}
+	},
+	"Character B": {
+		"color": "#ff7777",
+		"traits": {
+			"gender": "female",
+			"age": 20,
+			"personality": "bubbly"
+		}
+	}
+}
