@@ -212,7 +212,7 @@ def regen_node(data):
     print(log, end=" ", flush=True)
 
     result = model.complete(
-        log, config={"maxTokens": 256, "stopStrings": ["\n"], "temperature": 0.7}
+        log, config={"maxTokens": 768, "stopStrings": ["\n"], "temperature": 0.7}
     )
 
     text = result.content.strip()
