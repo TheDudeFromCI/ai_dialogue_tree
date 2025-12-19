@@ -38,6 +38,9 @@ def build_node(sender, text, parent):
 def build_prompt():
     global characters
 
+    with open(CHARACTERS_FILE) as f:
+        characters = json.load(f)
+
     prompt = ""
     for c_name in characters:
         character = characters[c_name]
