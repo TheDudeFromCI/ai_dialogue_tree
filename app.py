@@ -9,6 +9,7 @@ import lmstudio as lms
 
 CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", "characters.json")
 TREE_FILE = os.getenv("TREE_FILE", "tree.json")
+LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://localhost:1234")
 
 
 def load_characters():
@@ -123,7 +124,10 @@ load_tree()
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+lms.configure_default_client(LM_STUDIO_URL)
 model = lms.llm(characters["System"]["model"])
+lms.set_sync_api_timeout(600)
 
 
 @app.route("/", methods=["GET"])
@@ -210,14 +214,18 @@ def regen_node(data):
     result = None
     text = ""
     for _ in range(10):
-        result = model.complete(
-            log,
-            config={
-                "maxTokens": characters["System"]["maxTokens"],
-                "stopStrings": ["\n"],
-                "temperature": characters["System"]["temp"],
-            },
-        )
+        try:
+            result = model.complete(
+                log,
+                config={
+                    "maxTokens": characters["System"]["maxTokens"],
+                    "stopStrings": ["\n"],
+                    "temperature": characters["System"]["temp"],
+                },
+            )
+        except Exception as e:
+            print(f"{nid} Generation error: {str(e)}. Retrying...")
+            continue
 
         text = result.content.strip()
         if text != "":
