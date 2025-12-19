@@ -236,7 +236,7 @@ def regen_node(data):
     print("=" * 100)
 
     if extend:
-        text = f"${existing_text}  ${text}"
+        text = f"{existing_text}  {text}"
 
     tree[nid]["text"] = text
     save_tree_file()
