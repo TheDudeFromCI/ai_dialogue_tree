@@ -10,6 +10,9 @@ import lmstudio as lms
 CHARACTERS_FILE = os.getenv("CHARACTERS_FILE", "characters.json")
 TREE_FILE = os.getenv("TREE_FILE", "tree.json")
 LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://localhost:1234")
+LM_STUDIO_MODEL = os.getenv("LM_STUDIO_MODEL", "model")
+LM_STUDIO_TEMP = float(os.getenv("LM_STUDIO_TEMP", "0.7"))
+LM_STUDIO_MAX_TOKENS = int(os.getenv("LM_STUDIO_MAX_TOKENS", "256"))
 
 
 def load_characters():
@@ -23,9 +26,6 @@ def load_characters():
         characters = {}
 
     characters.setdefault("System", {})
-    characters["System"].setdefault("model", "model")
-    characters["System"].setdefault("temp", 0.7)
-    characters["System"].setdefault("maxTokens", 256)
 
 
 def load_tree():
@@ -126,7 +126,7 @@ app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 lms.configure_default_client(LM_STUDIO_URL)
-model = lms.llm(characters["System"]["model"])
+model = lms.llm(LM_STUDIO_MODEL)
 lms.set_sync_api_timeout(600)
 
 
@@ -220,9 +220,9 @@ def regen_node(data):
             result = model.complete(
                 log,
                 config={
-                    "maxTokens": characters["System"]["maxTokens"],
+                    "maxTokens": LM_STUDIO_MAX_TOKENS,
                     "stopStrings": ["\n"],
-                    "temperature": characters["System"]["temp"],
+                    "temperature": LM_STUDIO_TEMP,
                 },
             )
         except Exception as e:
