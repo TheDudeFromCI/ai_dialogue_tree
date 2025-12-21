@@ -44,9 +44,9 @@ def load_tree():
         nid = str(uuid4())
         tree[nid] = {
             "nid": nid,
-            "sender": sender,
+            "sender": "System",
             "text": build_prompt(),
-            "parent": parent,
+            "parent": None,
             "children": [],
         }
         save_tree_file()
