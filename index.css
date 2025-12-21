@@ -67,7 +67,11 @@ textarea {
 .textdisplay p {
   margin: auto;
   color: #dddd77;
+  &:not(:last-child)  {
+      margin-bottom: 16px;
+  }
 }
+
 
 .textdisplay p em {
   color: #bbbbbb;
