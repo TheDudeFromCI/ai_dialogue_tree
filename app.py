@@ -200,7 +200,9 @@ def regen_node(data):
         return
 
     log = build_chat_log(parent)
-    log += f"{tree[nid]["sender"]}:"
+
+    if tree[nid]["sender"] != "System":
+        log += f"{tree[nid]["sender"]}:"
     existing_text = tree[nid]["text"].strip()
 
     if extend:
