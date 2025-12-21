@@ -215,7 +215,7 @@ def regen_node(data):
 
     result = None
     text = ""
-    for _ in range(10):
+    for attempt in range(1, 11):
         try:
             result = model.complete(
                 log,
@@ -225,13 +225,16 @@ def regen_node(data):
                     "temperature": LM_STUDIO_TEMP,
                 },
             )
+            text = result.content.strip()
         except Exception as e:
-            print(f"{nid} Generation error: {str(e)}. Retrying...")
+            print(f"{nid} Generation error: {str(e)}. Retrying... ({attempt}/10)")
             continue
 
-        text = result.content.strip()
-        if text != "":
-            break
+        if text == "":
+            print(f"{nid} Generated empty text. Retrying... ({attempt}/10)")
+            continue
+
+        break
 
     if text == "":
         print(f"{nid} Failed to generate. Giving up.")
